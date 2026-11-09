@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="white">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A simple wallet calculator for tracking deposits, withdrawals, and your current balance.">
+    <title>FinStats — Wallet Calculator</title>
+    <script src="assets/js/app.js"></script>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <header class="page-header">
+        <div class="header-content">
+            <div class="brand" aria-label="FinStats home">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>
+                    </svg>
+                </span>
+                <span>FinStats</span>
+            </div>
+            <div class="header-actions">
+                <label class="theme-control" for="theme-select" title="Choose a color theme">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 3a9 9 0 0 0 0 18h1.4a1.6 1.6 0 0 0 1.1-2.75 1.6 1.6 0 0 1 1.1-2.75H18a3 3 0 0 0 3-3C21 6.75 17 3 12 3Z"/>
+                        <path d="M7.5 10h.01M9 6.8h.01M13.5 6.5h.01M17 9h.01"/>
+                    </svg>
+                    <select id="theme-select" name="theme" aria-label="Color theme">
+                        <option value="white">White</option>
+                        <option value="black">Black</option>
+                        <option value="blue">Blue</option>
+                    </select>
+                </label>
+                <button class="button button-secondary icon-button" id="logout-button" type="button" title="Sign out" aria-label="Sign out" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <path d="m16 17 5-5-5-5M21 12H9"/>
+                    </svg>
+                </button>
+                <button class="button button-secondary" id="export-button" type="button" title="Download balance and transaction history as JSON">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
+                    </svg>
+                    <span class="export-label">Export JSON</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="page-heading">
+            <div>
+                <p class="eyebrow">Personal finance</p>
+                <h1>Wallet overview</h1>
+            </div>
+            <div class="heading-side">
+                <p class="current-date" id="current-date"></p>
+                <div class="wallet-toolbar" role="group" aria-label="Wallet management">
+                    <label class="wallet-toolbar-label" for="wallet-select">Wallet</label>
+                    <div class="wallet-select-wrap">
+                        <select id="wallet-select" aria-label="Active wallet" disabled></select>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="m6 9 6 6 6-6"/>
+                        </svg>
+                    </div>
+                    <button class="button button-secondary" id="new-wallet-button" type="button" title="Create a new wallet" aria-label="Create a new wallet" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                        <span class="wallet-action-label">New wallet</span>
+                    </button>
+                    <button class="button button-secondary icon-button" id="wallet-settings-button" type="button" title="Rename or delete the active wallet" aria-label="Rename or delete the active wallet" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 20h9"/>
+                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <section class="overview" aria-label="Wallet summary">
+            <article class="balance-card">
+                <div>
+                    <div class="balance-label">Current balance</div>
+                    <p class="balance-amount" id="balance" aria-live="polite">$0.00</p>
+                </div>
+                <div class="balance-footer">
+                    <span class="balance-wallet-name" id="balance-wallet-name">Wallet</span>
+                    <label class="currency-badge" for="wallet-currency">
+                        <select id="wallet-currency" name="wallet-currency" aria-label="Wallet display currency">
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="UAH">UAH</option>
+                        </select>
+                    </label>
+                </div>
+            </article>
+
+            <article class="stats-card">
+                <div class="stat-row">
+                    <div class="stat-description">
+                        <span class="stat-icon" aria-hidden="true">↗</span>
+                        <span>Total added</span>
+                    </div>
+                    <strong class="stat-value" id="total-added">$0.00</strong>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-description">
+                        <span class="stat-icon withdrawal" aria-hidden="true">↙</span>
+                        <span>Total withdrawn</span>
+                    </div>
+                    <strong class="stat-value" id="total-withdrawn">$0.00</strong>
+                </div>
+                <div class="stat-row">
+                    <div class="stat-description">
+                        <span class="stat-icon neutral" aria-hidden="true">#</span>
+                        <span>Transactions</span>
+                    </div>
+                    <strong class="stat-value" id="transaction-count">0</strong>
+                </div>
+            </article>
+        </section>
+
+        <section class="workspace">
+            <article class="calculator-card">
+                <div class="card-header">
+                    <div>
+                        <h2>New transaction</h2>
+                        <p class="card-subtitle">Add or withdraw money from your wallet.</p>
+                    </div>
+                </div>
+
+                <form id="transaction-form" novalidate>
+                    <div class="field">
+                        <label for="amount">Amount</label>
+                        <div class="amount-input-wrap">
+                            <span class="currency-symbol" id="currency-symbol" aria-hidden="true">$</span>
+                            <input id="amount" name="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-describedby="amount-error" required>
+                        </div>
+                        <p class="field-error" id="amount-error" role="alert"></p>
+                    </div>
+
+                    <div class="field">
+                        <label for="note">Note <span class="optional">(optional)</span></label>
+                        <input id="note" name="note" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Salary or groceries">
+                    </div>
+
+                    <div class="transaction-actions">
+                        <button class="button button-deposit" type="submit" name="operation" value="deposit" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
+                            Add funds
+                        </button>
+                        <button class="button button-withdraw" type="submit" name="operation" value="withdrawal" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                                <path d="M5 12h14"/>
+                            </svg>
+                            Withdraw
+                        </button>
+                    </div>
+                </form>
+
+                <p class="privacy-note">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+                    </svg>
+                    <span class="storage-status" id="storage-status" role="status" aria-live="polite">Connecting to your wallets…</span>
+                </p>
+            </article>
+
+            <article class="history-card">
+                <div class="card-header">
+                    <div>
+                        <h2>Recent activity</h2>
+                        <p class="card-subtitle">Your latest transactions in this wallet.</p>
+                    </div>
+                    <button class="text-button" id="clear-button" type="button" disabled>Clear history</button>
+                </div>
+
+                <div class="empty-state" id="empty-state">
+                    <div class="empty-state-icon" id="empty-currency-symbol" aria-hidden="true">$</div>
+                    <p>No transactions yet</p>
+                    <span>Add funds to start calculating your balance.</span>
+                </div>
+                <ul class="transaction-list" id="transaction-list" aria-label="Transaction history"></ul>
+            </article>
+        </section>
+
+        <section class="converter-card" aria-labelledby="converter-title">
+            <div class="card-header">
+                <div>
+                    <h2 id="converter-title">Currency converter</h2>
+                    <p class="card-subtitle">Convert between USD, EUR, and UAH using live exchange rates.</p>
+                </div>
+            </div>
+
+            <div class="converter-grid">
+                <div class="converter-field converter-amount-field">
+                    <label for="converter-amount">Amount</label>
+                    <input id="converter-amount" type="text" inputmode="decimal" autocomplete="off" value="100.00" aria-describedby="converter-error">
+                </div>
+                <div class="converter-field converter-from-field">
+                    <label for="converter-from">From</label>
+                    <select id="converter-from">
+                        <option value="USD">USD — US dollar</option>
+                        <option value="EUR">EUR — Euro</option>
+                        <option value="UAH">UAH — Ukrainian hryvnia</option>
+                    </select>
+                </div>
+                <button class="button button-secondary swap-button" id="swap-currencies" type="button" aria-label="Swap conversion currencies" title="Swap currencies">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M7 7h14m0 0-4-4m4 4-4 4M17 17H3m0 0 4-4m-4 4 4 4"/>
+                    </svg>
+                </button>
+                <div class="converter-field converter-to-field">
+                    <label for="converter-to">To</label>
+                    <select id="converter-to">
+                        <option value="USD">USD — US dollar</option>
+                        <option value="EUR" selected>EUR — Euro</option>
+                        <option value="UAH">UAH — Ukrainian hryvnia</option>
+                    </select>
+                </div>
+                <div class="converter-result-panel">
+                    <span class="converter-result-label">Converted amount</span>
+                    <output class="converter-result" id="converter-result" for="converter-amount converter-from converter-to">—</output>
+                </div>
+            </div>
+            <p class="field-error converter-error" id="converter-error" role="alert"></p>
+            <p class="converter-rate" id="converter-rate">Loading live exchange rates…</p>
+            <div class="rate-status-row">
+                <p class="converter-disclaimer rate-status" id="rate-status" role="status" aria-live="polite">Loading live exchange rates…</p>
+                <button class="button button-secondary refresh-rates-button" id="refresh-rates" type="button">Refresh rates</button>
+            </div>
+            <p class="rate-source">Rates provided by <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer">ExchangeRate-API</a>.</p>
+        </section>
+    </main>
+
+    <footer class="page-footer">FinStats wallet calculator &middot; Wallets, balances, and operations are saved to your account</footer>
+
+    <dialog class="wallet-dialog" id="wallet-dialog" aria-labelledby="wallet-dialog-title">
+        <form class="wallet-dialog-form" id="wallet-form" novalidate>
+            <div class="card-header">
+                <div>
+                    <h2 id="wallet-dialog-title">New wallet</h2>
+                    <p class="card-subtitle" id="wallet-dialog-subtitle">Create another wallet with its own balance and transactions.</p>
+                </div>
+            </div>
+            <div class="field">
+                <label for="wallet-name">Wallet name</label>
+                <input id="wallet-name" name="wallet-name" type="text" maxlength="60" autocomplete="off" placeholder="e.g. Savings" aria-describedby="wallet-name-error" required>
+                <p class="field-error" id="wallet-name-error" role="alert"></p>
+            </div>
+            <div class="dialog-actions">
+                <button class="text-button dialog-delete" id="wallet-delete-button" type="button" hidden>Delete wallet</button>
+                <div class="dialog-actions-primary">
+                    <button class="button button-secondary" id="wallet-cancel-button" type="button">Cancel</button>
+                    <button class="button button-deposit" id="wallet-save-button" type="submit">Create wallet</button>
+                </div>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="wallet-dialog" id="operation-dialog" aria-labelledby="operation-dialog-title">
+        <form class="wallet-dialog-form" id="operation-form" novalidate>
+            <div class="card-header">
+                <div>
+                    <h2 id="operation-dialog-title">Edit transaction</h2>
+                    <p class="card-subtitle" id="operation-dialog-subtitle">Update this transaction and the wallet balance will follow.</p>
+                </div>
+            </div>
+            <div class="field">
+                <label for="operation-type">Type</label>
+                <select class="dialog-select" id="operation-type" name="operation-type">
+                    <option value="deposit">Deposit</option>
+                    <option value="withdrawal">Withdrawal</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="operation-amount">Amount <span class="optional" id="operation-currency-label">(USD)</span></label>
+                <div class="amount-input-wrap">
+                    <span class="currency-symbol" id="operation-currency-symbol" aria-hidden="true">$</span>
+                    <input id="operation-amount" name="operation-amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-describedby="operation-error" required>
+                </div>
+                <p class="field-error" id="operation-error" role="alert"></p>
+            </div>
+            <div class="field">
+                <label for="operation-note">Note <span class="optional">(optional)</span></label>
+                <input id="operation-note" name="operation-note" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Salary or groceries">
+            </div>
+            <div class="dialog-actions">
+                <div class="dialog-actions-primary">
+                    <button class="button button-secondary" id="operation-cancel-button" type="button">Cancel</button>
+                    <button class="button button-deposit" id="operation-save-button" type="submit">Save changes</button>
+                </div>
+            </div>
+        </form>
+    </dialog>
+
+    <div class="auth-overlay" id="auth-overlay" hidden>
+        <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+            <div class="brand auth-brand" aria-hidden="true">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>
+                    </svg>
+                </span>
+                <span>FinStats</span>
+            </div>
+            <h1 id="auth-title">Sign in</h1>
+            <p class="auth-subtitle" id="auth-subtitle">Enter your credentials to access your wallets.</p>
+            <form id="auth-form" novalidate>
+                <div class="field">
+                    <label for="auth-username">Username</label>
+                    <input id="auth-username" name="auth-username" type="text" maxlength="60" autocomplete="username" required>
+                </div>
+                <div class="field">
+                    <label for="auth-password">Password</label>
+                    <input id="auth-password" name="auth-password" type="password" maxlength="72" autocomplete="current-password" required>
+                </div>
+                <div class="field" id="auth-confirm-field" hidden>
+                    <label for="auth-confirm">Confirm password</label>
+                    <input id="auth-confirm" name="auth-confirm" type="password" maxlength="72" autocomplete="new-password">
+                </div>
+                <p class="field-error" id="auth-error" role="alert"></p>
+                <button class="button button-deposit auth-submit" id="auth-submit" type="submit">Sign in</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

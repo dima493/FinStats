@@ -31,6 +31,12 @@
                         <option value="blue">Blue</option>
                     </select>
                 </label>
+                <button class="button button-secondary icon-button" id="logout-button" type="button" title="Sign out" aria-label="Sign out" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <path d="m16 17 5-5-5-5M21 12H9"/>
+                    </svg>
+                </button>
                 <button class="button button-secondary" id="export-button" type="button" title="Download balance and transaction history as JSON">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
@@ -291,6 +297,37 @@
             </div>
         </form>
     </dialog>
+
+    <div class="auth-overlay" id="auth-overlay" hidden>
+        <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+            <div class="brand auth-brand" aria-hidden="true">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/>
+                    </svg>
+                </span>
+                <span>FinStats</span>
+            </div>
+            <h1 id="auth-title">Sign in</h1>
+            <p class="auth-subtitle" id="auth-subtitle">Enter your credentials to access your wallets.</p>
+            <form id="auth-form" novalidate>
+                <div class="field">
+                    <label for="auth-username">Username</label>
+                    <input id="auth-username" name="auth-username" type="text" maxlength="60" autocomplete="username" required>
+                </div>
+                <div class="field">
+                    <label for="auth-password">Password</label>
+                    <input id="auth-password" name="auth-password" type="password" maxlength="72" autocomplete="current-password" required>
+                </div>
+                <div class="field" id="auth-confirm-field" hidden>
+                    <label for="auth-confirm">Confirm password</label>
+                    <input id="auth-confirm" name="auth-confirm" type="password" maxlength="72" autocomplete="new-password">
+                </div>
+                <p class="field-error" id="auth-error" role="alert"></p>
+                <button class="button button-deposit auth-submit" id="auth-submit" type="submit">Sign in</button>
+            </form>
+        </div>
+    </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>

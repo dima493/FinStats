@@ -28,6 +28,31 @@ function readJsonBody(): array
     return $data;
 }
 
+function startAuthSession(): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return;
+    }
+
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'httponly' => true,
+        'samesite' => 'Lax',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+    ]);
+    session_name('finstats_session');
+    session_start();
+}
+
+function requireAuth(): void
+{
+    startAuthSession();
+    if (!isset($_SESSION['user_id'])) {
+        respond(401, ['error' => 'Authentication required. Sign in to continue.']);
+    }
+}
+
 function readWalletId(mixed $value, bool $optional = false): ?int
 {
     if ($value === null || $value === '') {

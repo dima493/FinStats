@@ -304,6 +304,7 @@ function clearOperations(PDO $connection, int $walletId): void
 }
 
 try {
+    requireAuth();
     $connection = database();
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 

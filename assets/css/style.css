@@ -843,6 +843,54 @@ h2 {
     transform: translateY(0);
 }
 
+.auth-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    overflow-y: auto;
+    background: var(--background);
+}
+
+.auth-overlay[hidden] {
+    display: none;
+}
+
+.auth-card {
+    width: min(400px, 100%);
+    padding: 32px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: 0 24px 60px rgba(15, 35, 27, 0.18);
+}
+
+.auth-brand {
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.auth-card h1 {
+    margin: 0 0 6px;
+    font-size: 1.35rem;
+    text-align: center;
+}
+
+.auth-subtitle {
+    margin: 0 0 24px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.auth-submit {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+}
+
 .wallet-dialog {
     width: min(430px, calc(100% - 32px));
     padding: 0;

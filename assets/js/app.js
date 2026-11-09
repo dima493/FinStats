@@ -5,6 +5,7 @@
     const MYSQL_MIGRATION_KEY = "finstats.mysqlMigrated.v1";
     const WALLET_API_URL = "api/wallet.php";
     const WALLETS_API_URL = "api/wallets.php";
+    const AUTH_API_URL = "api/auth.php";
     const ACTIVE_WALLET_STORAGE_KEY = "finstats.activeWalletId";
     const THEME_STORAGE_KEY = "finstats.theme";
     const CURRENCY_STORAGE_KEY = "finstats.currency";
@@ -139,6 +140,17 @@
             operationCurrencySymbol: document.getElementById("operation-currency-symbol"),
             operationSaveButton: document.getElementById("operation-save-button"),
             operationCancelButton: document.getElementById("operation-cancel-button"),
+            authOverlay: document.getElementById("auth-overlay"),
+            authForm: document.getElementById("auth-form"),
+            authTitle: document.getElementById("auth-title"),
+            authSubtitle: document.getElementById("auth-subtitle"),
+            authUsername: document.getElementById("auth-username"),
+            authPassword: document.getElementById("auth-password"),
+            authConfirmField: document.getElementById("auth-confirm-field"),
+            authConfirm: document.getElementById("auth-confirm"),
+            authError: document.getElementById("auth-error"),
+            authSubmit: document.getElementById("auth-submit"),
+            logoutButton: document.getElementById("logout-button"),
             toast: document.getElementById("toast")
         };
 
@@ -149,6 +161,7 @@
         let activeWalletName = "";
         let walletDialogMode = "create";
         let editingOperationId = null;
+        let authMode = "login";
         let isWalletReady = false;
         let isWalletBusy = true;
         let displayCurrency = getSavedCurrency();
@@ -224,6 +237,9 @@
                 throw new Error("The server returned an invalid response. Open the app through XAMPP, not as a file.");
             }
             if (!response.ok) {
+                if (response.status === 401 && url !== AUTH_API_URL) {
+                    showAuthOverlay("login");
+                }
                 throw new Error(data?.error || `Wallet request failed with status ${response.status}.`);
             }
             return data;
@@ -725,6 +741,115 @@
             showToast("Wallet result exported as wallet-result.json");
         }
 
+        function showAuthOverlay(mode) {
+            authMode = mode;
+            const setup = mode === "setup";
+            elements.authTitle.textContent = setup ? "Create your account" : "Sign in";
+            elements.authSubtitle.textContent = setup
+                ? "Set a username and password to protect your wallets."
+                : "Enter your credentials to access your wallets.";
+            elements.authConfirmField.hidden = !setup;
+            elements.authPassword.autocomplete = setup ? "new-password" : "current-password";
+            elements.authSubmit.textContent = setup ? "Create account" : "Sign in";
+            elements.authError.textContent = "";
+            elements.authSubmit.disabled = false;
+            elements.authOverlay.hidden = false;
+            elements.logoutButton.hidden = true;
+            elements.authUsername.focus();
+        }
+
+        function hideAuthOverlay() {
+            elements.authOverlay.hidden = true;
+            elements.logoutButton.hidden = false;
+        }
+
+        async function startAuthenticatedApp() {
+            hideAuthOverlay();
+            await initializeWallets();
+            refreshLiveRates();
+        }
+
+        async function checkAuth() {
+            try {
+                const data = await requestJson(AUTH_API_URL, "GET");
+                if (data.needsSetup) {
+                    showAuthOverlay("setup");
+                } else if (!data.authenticated) {
+                    showAuthOverlay("login");
+                } else {
+                    await startAuthenticatedApp();
+                }
+            } catch (error) {
+                showAuthOverlay("login");
+                elements.authError.textContent = error.message;
+            }
+        }
+
+        elements.authForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            elements.authError.textContent = "";
+
+            const username = elements.authUsername.value.trim();
+            const password = elements.authPassword.value;
+            if (!username) {
+                elements.authError.textContent = "Enter your username.";
+                elements.authUsername.focus();
+                return;
+            }
+            if (!password) {
+                elements.authError.textContent = "Enter your password.";
+                elements.authPassword.focus();
+                return;
+            }
+            if (authMode === "setup") {
+                if (password.length < 8) {
+                    elements.authError.textContent = "Password must be at least 8 characters.";
+                    elements.authPassword.focus();
+                    return;
+                }
+                if (password !== elements.authConfirm.value) {
+                    elements.authError.textContent = "Passwords do not match.";
+                    elements.authConfirm.focus();
+                    return;
+                }
+            }
+
+            elements.authSubmit.disabled = true;
+            try {
+                const data = await requestJson(AUTH_API_URL, "POST", {
+                    action: authMode,
+                    username,
+                    password
+                });
+                elements.authForm.reset();
+                await startAuthenticatedApp();
+                showToast(authMode === "setup"
+                    ? "Account created. Your wallets are now protected."
+                    : `Signed in as ${data.username}.`);
+            } catch (error) {
+                elements.authError.textContent = error.message;
+            } finally {
+                elements.authSubmit.disabled = false;
+            }
+        });
+
+        elements.logoutButton.addEventListener("click", async () => {
+            try {
+                await requestJson(AUTH_API_URL, "POST", { action: "logout" });
+            } catch (error) {
+                // The local session is cleared below even when the server is unreachable.
+            }
+            transactions = [];
+            walletTotals = { balanceCents: 0, addedCents: 0, withdrawnCents: 0 };
+            wallets = [];
+            isWalletReady = false;
+            renderWalletSelect();
+            render();
+            setWalletStatus("Signed out.");
+            showAuthOverlay("login");
+            showToast("Signed out.");
+        });
+
         elements.form.addEventListener("submit", async (event) => {
             event.preventDefault();
             clearAmountError();
@@ -1129,8 +1254,7 @@
         updateRatesUI();
         updateConverter();
         render();
-        initializeWallets();
-        refreshLiveRates();
+        checkAuth();
     }
 
     if (document.readyState === "loading") {
