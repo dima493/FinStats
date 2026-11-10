@@ -891,6 +891,42 @@ h2 {
     margin-top: 4px;
 }
 
+.auth-links {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.account-section {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+.account-section h3 {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+}
+
+.account-section .button {
+    margin-top: 12px;
+}
+
+.recovery-code {
+    margin: 12px 0 0;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: var(--green-soft);
+    font-family: "Courier New", monospace;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-align: center;
+    word-break: break-all;
+}
+
 .wallet-dialog {
     width: min(430px, calc(100% - 32px));
     padding: 0;

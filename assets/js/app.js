@@ -152,6 +152,25 @@
             authConfirm: document.getElementById("auth-confirm"),
             authError: document.getElementById("auth-error"),
             authSubmit: document.getElementById("auth-submit"),
+            authRecoveryField: document.getElementById("auth-recovery-field"),
+            authRecovery: document.getElementById("auth-recovery"),
+            authPasswordLabel: document.getElementById("auth-password-label"),
+            authForgotLink: document.getElementById("auth-forgot-link"),
+            authSwitchLink: document.getElementById("auth-switch-link"),
+            accountButton: document.getElementById("account-button"),
+            accountDialog: document.getElementById("account-dialog"),
+            accountSubtitle: document.getElementById("account-subtitle"),
+            accountCurrent: document.getElementById("account-current"),
+            accountNew: document.getElementById("account-new"),
+            accountConfirm: document.getElementById("account-confirm"),
+            accountError: document.getElementById("account-error"),
+            accountCloseButton: document.getElementById("account-close-button"),
+            accountPasswordButton: document.getElementById("account-password-button"),
+            accountRecoveryStatus: document.getElementById("account-recovery-status"),
+            accountRecoveryButton: document.getElementById("account-recovery-button"),
+            accountRecoveryCode: document.getElementById("account-recovery-code"),
+            accountRecoveryNote: document.getElementById("account-recovery-note"),
+            accountDeleteButton: document.getElementById("account-delete-button"),
             logoutButton: document.getElementById("logout-button"),
             toast: document.getElementById("toast")
         };
@@ -164,6 +183,8 @@
         let walletDialogMode = "create";
         let editingOperationId = null;
         let authMode = "login";
+        let currentUsername = "";
+        let currentHasRecovery = false;
         let isWalletReady = false;
         let isWalletBusy = true;
         let displayCurrency = getSavedCurrency();
@@ -863,24 +884,33 @@
 
         function showAuthOverlay(mode) {
             authMode = mode;
-            const setup = mode === "setup";
-            elements.authTitle.textContent = setup ? "Create your account" : "Sign in";
-            elements.authSubtitle.textContent = setup
-                ? "Set a username and password to protect your wallets."
-                : "Enter your credentials to access your wallets.";
-            elements.authConfirmField.hidden = !setup;
-            elements.authPassword.autocomplete = setup ? "new-password" : "current-password";
-            elements.authSubmit.textContent = setup ? "Create account" : "Sign in";
+            const signup = mode === "signup";
+            const forgot = mode === "forgot";
+            elements.authTitle.textContent = signup ? "Create your account" : (forgot ? "Reset password" : "Sign in");
+            elements.authSubtitle.textContent = signup
+                ? "Pick a username and password. Your wallets stay private to your account."
+                : (forgot
+                    ? "Enter your username, recovery code, and a new password."
+                    : "Enter your credentials to access your wallets.");
+            elements.authConfirmField.hidden = !(signup || forgot);
+            elements.authRecoveryField.hidden = !forgot;
+            elements.authPasswordLabel.textContent = (signup || forgot) ? "New password" : "Password";
+            elements.authPassword.autocomplete = (signup || forgot) ? "new-password" : "current-password";
+            elements.authSubmit.textContent = signup ? "Create account" : (forgot ? "Set new password" : "Sign in");
+            elements.authSwitchLink.textContent = signup ? "Sign in instead" : (forgot ? "Back to sign in" : "Create an account");
+            elements.authForgotLink.hidden = mode !== "login";
             elements.authError.textContent = "";
             elements.authSubmit.disabled = false;
             elements.authOverlay.hidden = false;
             elements.logoutButton.hidden = true;
+            elements.accountButton.hidden = true;
             elements.authUsername.focus();
         }
 
         function hideAuthOverlay() {
             elements.authOverlay.hidden = true;
             elements.logoutButton.hidden = false;
+            elements.accountButton.hidden = false;
         }
 
         async function startAuthenticatedApp() {
@@ -892,8 +922,10 @@
         async function checkAuth() {
             try {
                 const data = await requestJson(AUTH_API_URL, "GET");
-                if (data.needsSetup) {
-                    showAuthOverlay("setup");
+                currentUsername = data.username || "";
+                currentHasRecovery = Boolean(data.hasRecoveryCode);
+                if (!data.authenticated && data.needsSetup) {
+                    showAuthOverlay("signup");
                 } else if (!data.authenticated) {
                     showAuthOverlay("login");
                 } else {
@@ -921,7 +953,7 @@
                 elements.authPassword.focus();
                 return;
             }
-            if (authMode === "setup") {
+            if (authMode === "signup" || authMode === "forgot") {
                 if (password.length < 8) {
                     elements.authError.textContent = "Password must be at least 8 characters.";
                     elements.authPassword.focus();
@@ -933,6 +965,33 @@
                     return;
                 }
             }
+            if (authMode === "forgot") {
+                const recoveryCode = elements.authRecovery.value.trim();
+                if (!recoveryCode) {
+                    elements.authError.textContent = "Enter your recovery code.";
+                    elements.authRecovery.focus();
+                    return;
+                }
+
+                elements.authSubmit.disabled = true;
+                try {
+                    await requestJson(AUTH_API_URL, "POST", {
+                        action: "forgot_password",
+                        username,
+                        newPassword: password,
+                        recoveryCode
+                    });
+                    elements.authForm.reset();
+                    showAuthOverlay("login");
+                    elements.authUsername.value = username;
+                    showToast("Password updated. Sign in with your new password.");
+                } catch (error) {
+                    elements.authError.textContent = error.message;
+                } finally {
+                    elements.authSubmit.disabled = false;
+                }
+                return;
+            }
 
             elements.authSubmit.disabled = true;
             try {
@@ -941,10 +1000,12 @@
                     username,
                     password
                 });
+                currentUsername = data.username || username;
+                currentHasRecovery = Boolean(data.hasRecoveryCode);
                 elements.authForm.reset();
                 await startAuthenticatedApp();
-                showToast(authMode === "setup"
-                    ? "Account created. Your wallets are now protected."
+                showToast(authMode === "signup"
+                    ? "Account created. Your wallets are private to your account."
                     : `Signed in as ${data.username}.`);
             } catch (error) {
                 elements.authError.textContent = error.message;
@@ -953,21 +1014,148 @@
             }
         });
 
+        elements.authForgotLink.addEventListener("click", () => showAuthOverlay("forgot"));
+        elements.authSwitchLink.addEventListener("click", () => {
+            showAuthOverlay(authMode === "login" ? "signup" : "login");
+        });
+
+        function resetSignedOutState() {
+            transactions = [];
+            walletTotals = { balanceCents: 0, addedCents: 0, withdrawnCents: 0 };
+            wallets = [];
+            activeWalletId = null;
+            activeWalletName = "";
+            currentUsername = "";
+            currentHasRecovery = false;
+            isWalletReady = false;
+            renderWalletSelect();
+            render();
+        }
+
         elements.logoutButton.addEventListener("click", async () => {
             try {
                 await requestJson(AUTH_API_URL, "POST", { action: "logout" });
             } catch (error) {
                 // The local session is cleared below even when the server is unreachable.
             }
-            transactions = [];
-            walletTotals = { balanceCents: 0, addedCents: 0, withdrawnCents: 0 };
-            wallets = [];
-            isWalletReady = false;
-            renderWalletSelect();
-            render();
+            resetSignedOutState();
             setWalletStatus("Signed out.");
             showAuthOverlay("login");
             showToast("Signed out.");
+        });
+
+        function openAccountDialog() {
+            elements.accountSubtitle.textContent =
+                `Signed in as ${currentUsername}. Manage your password and account security.`;
+            elements.accountCurrent.value = "";
+            elements.accountNew.value = "";
+            elements.accountConfirm.value = "";
+            elements.accountError.textContent = "";
+            elements.accountRecoveryCode.hidden = true;
+            elements.accountRecoveryNote.hidden = true;
+            elements.accountRecoveryStatus.textContent = currentHasRecovery
+                ? "A recovery code is active. Generating a new one replaces it."
+                : "No recovery code yet. Generate one to reset your password if you forget it.";
+            elements.accountDialog.showModal();
+            elements.accountCurrent.focus();
+        }
+
+        elements.accountButton.addEventListener("click", openAccountDialog);
+        elements.accountCloseButton.addEventListener("click", () => elements.accountDialog.close());
+        elements.accountDialog.addEventListener("click", (event) => {
+            if (event.target === elements.accountDialog) elements.accountDialog.close();
+        });
+
+        elements.accountPasswordButton.addEventListener("click", async () => {
+            elements.accountError.textContent = "";
+            const currentPassword = elements.accountCurrent.value;
+            const newPassword = elements.accountNew.value;
+            if (!currentPassword) {
+                elements.accountError.textContent = "Enter your current password.";
+                elements.accountCurrent.focus();
+                return;
+            }
+            if (newPassword.length < 8) {
+                elements.accountError.textContent = "New password must be at least 8 characters.";
+                elements.accountNew.focus();
+                return;
+            }
+            if (newPassword !== elements.accountConfirm.value) {
+                elements.accountError.textContent = "New passwords do not match.";
+                elements.accountConfirm.focus();
+                return;
+            }
+
+            elements.accountPasswordButton.disabled = true;
+            try {
+                await requestJson(AUTH_API_URL, "POST", {
+                    action: "change_password",
+                    currentPassword,
+                    newPassword
+                });
+                elements.accountCurrent.value = "";
+                elements.accountNew.value = "";
+                elements.accountConfirm.value = "";
+                showToast("Password changed.");
+            } catch (error) {
+                elements.accountError.textContent = error.message;
+            } finally {
+                elements.accountPasswordButton.disabled = false;
+            }
+        });
+
+        elements.accountRecoveryButton.addEventListener("click", async () => {
+            elements.accountError.textContent = "";
+            const password = elements.accountCurrent.value;
+            if (!password) {
+                elements.accountError.textContent = "Enter your current password to generate a recovery code.";
+                elements.accountCurrent.focus();
+                return;
+            }
+
+            elements.accountRecoveryButton.disabled = true;
+            try {
+                const data = await requestJson(AUTH_API_URL, "POST", { action: "recovery_code", password });
+                currentHasRecovery = true;
+                elements.accountRecoveryCode.textContent = data.recoveryCode;
+                elements.accountRecoveryCode.hidden = false;
+                elements.accountRecoveryNote.hidden = false;
+                elements.accountRecoveryStatus.textContent =
+                    "A recovery code is active. Generating a new one replaces it.";
+                showToast("Recovery code generated. Save it now — it is shown only once.");
+            } catch (error) {
+                elements.accountError.textContent = error.message;
+            } finally {
+                elements.accountRecoveryButton.disabled = false;
+            }
+        });
+
+        elements.accountDeleteButton.addEventListener("click", async () => {
+            elements.accountError.textContent = "";
+            const password = elements.accountCurrent.value;
+            if (!password) {
+                elements.accountError.textContent = "Enter your current password to delete your account.";
+                elements.accountCurrent.focus();
+                return;
+            }
+            const confirmed = window.confirm(
+                `Delete the account "${currentUsername}"? All of its wallets and transactions will be permanently removed. This cannot be undone.`
+            );
+            if (!confirmed) return;
+
+            elements.accountDeleteButton.disabled = true;
+            try {
+                await requestJson(AUTH_API_URL, "POST", { action: "delete_account", password });
+                elements.accountDialog.close();
+                resetSignedOutState();
+                setWalletStatus("Account deleted.");
+                showAuthOverlay("login");
+                showToast("Account deleted.");
+            } catch (error) {
+                elements.accountError.textContent = error.message;
+            } finally {
+                elements.accountDeleteButton.disabled = false;
+            }
         });
 
         elements.form.addEventListener("submit", async (event) => {

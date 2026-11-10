@@ -38,9 +38,9 @@ function formatDate(string $date): string
         ->format('Y-m-d\TH:i:s.u\Z');
 }
 
-function walletPayload(PDO $connection, int $walletId): array
+function walletPayload(PDO $connection, int $walletId, int $userId): array
 {
-    $wallet = fetchWallet($connection, $walletId);
+    $wallet = fetchWallet($connection, $walletId, $userId);
 
     $statement = $connection->prepare(
         "SELECT
@@ -79,13 +79,13 @@ function walletPayload(PDO $connection, int $walletId): array
     ];
 }
 
-function createOperation(PDO $connection, int $walletId, array $input): void
+function createOperation(PDO $connection, int $walletId, int $userId, array $input): void
 {
     [$type, $amountCents, $note] = validateOperation($input);
 
     $connection->beginTransaction();
     try {
-        $wallet = fetchWallet($connection, $walletId, true);
+        $wallet = fetchWallet($connection, $walletId, $userId, true);
         $balance = (int) $wallet['balance_cents'];
 
         if ($type === 'withdrawal' && $amountCents > $balance) {
@@ -115,7 +115,7 @@ function createOperation(PDO $connection, int $walletId, array $input): void
         throw $error;
     }
 
-    respond(201, walletPayload($connection, $walletId));
+    respond(201, walletPayload($connection, $walletId, $userId));
 }
 
 function operationEffect(string $type, int $amountCents): int
@@ -139,14 +139,14 @@ function lockOperation(PDO $connection, int $walletId, int $operationId): array
     return $operation;
 }
 
-function updateOperation(PDO $connection, int $walletId, array $input): void
+function updateOperation(PDO $connection, int $walletId, int $userId, array $input): void
 {
     $operationId = readOperationId($input['operationId'] ?? $_GET['operationId'] ?? null);
     [$type, $amountCents, $note] = validateOperation($input);
 
     $connection->beginTransaction();
     try {
-        $wallet = fetchWallet($connection, $walletId, true);
+        $wallet = fetchWallet($connection, $walletId, $userId, true);
         $operation = lockOperation($connection, $walletId, $operationId);
 
         $newBalance = (int) $wallet['balance_cents']
@@ -176,14 +176,14 @@ function updateOperation(PDO $connection, int $walletId, array $input): void
         throw $error;
     }
 
-    respond(200, walletPayload($connection, $walletId));
+    respond(200, walletPayload($connection, $walletId, $userId));
 }
 
-function deleteOperation(PDO $connection, int $walletId, int $operationId): void
+function deleteOperation(PDO $connection, int $walletId, int $userId, int $operationId): void
 {
     $connection->beginTransaction();
     try {
-        $wallet = fetchWallet($connection, $walletId, true);
+        $wallet = fetchWallet($connection, $walletId, $userId, true);
         $operation = lockOperation($connection, $walletId, $operationId);
 
         $newBalance = (int) $wallet['balance_cents']
@@ -210,10 +210,10 @@ function deleteOperation(PDO $connection, int $walletId, int $operationId): void
         throw $error;
     }
 
-    respond(200, walletPayload($connection, $walletId));
+    respond(200, walletPayload($connection, $walletId, $userId));
 }
 
-function importOperations(PDO $connection, int $walletId, array $input): void
+function importOperations(PDO $connection, int $walletId, int $userId, array $input): void
 {
     $operations = $input['operations'] ?? null;
     if (!is_array($operations) || count($operations) === 0 || count($operations) > 5000) {
@@ -245,7 +245,7 @@ function importOperations(PDO $connection, int $walletId, array $input): void
 
     $connection->beginTransaction();
     try {
-        $wallet = fetchWallet($connection, $walletId, true);
+        $wallet = fetchWallet($connection, $walletId, $userId, true);
         $balance = (int) $wallet['balance_cents'];
         $insert = $connection->prepare(
             'INSERT INTO operations (wallet_id, type, amount_cents, note, created_at)
@@ -271,14 +271,14 @@ function importOperations(PDO $connection, int $walletId, array $input): void
         throw $error;
     }
 
-    respond(200, walletPayload($connection, $walletId));
+    respond(200, walletPayload($connection, $walletId, $userId));
 }
 
-function clearOperations(PDO $connection, int $walletId): void
+function clearOperations(PDO $connection, int $walletId, int $userId): void
 {
     $connection->beginTransaction();
     try {
-        fetchWallet($connection, $walletId, true);
+        fetchWallet($connection, $walletId, $userId, true);
 
         $statement = $connection->prepare('DELETE FROM operations WHERE wallet_id = ?');
         $statement->execute([$walletId]);
@@ -292,39 +292,39 @@ function clearOperations(PDO $connection, int $walletId): void
         throw $error;
     }
 
-    respond(200, walletPayload($connection, $walletId));
+    respond(200, walletPayload($connection, $walletId, $userId));
 }
 
 try {
-    requireAuth();
+    $userId = requireAuth();
     $connection = database();
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
     if ($method === 'GET') {
-        $walletId = readWalletId($_GET['walletId'] ?? null, true) ?? defaultWalletId($connection);
-        respond(200, walletPayload($connection, $walletId));
+        $walletId = readWalletId($_GET['walletId'] ?? null, true) ?? defaultWalletId($connection, $userId);
+        respond(200, walletPayload($connection, $walletId, $userId));
     }
     if ($method === 'POST') {
         $input = readJsonBody();
         $walletId = readWalletId($input['walletId'] ?? $_GET['walletId'] ?? null, true)
-            ?? defaultWalletId($connection);
+            ?? defaultWalletId($connection, $userId);
         if (($input['action'] ?? 'create') === 'import') {
-            importOperations($connection, $walletId, $input);
+            importOperations($connection, $walletId, $userId, $input);
         }
-        createOperation($connection, $walletId, $input);
+        createOperation($connection, $walletId, $userId, $input);
     }
     if ($method === 'PATCH') {
         $input = readJsonBody();
         $walletId = readWalletId($input['walletId'] ?? $_GET['walletId'] ?? null, true)
-            ?? defaultWalletId($connection);
-        updateOperation($connection, $walletId, $input);
+            ?? defaultWalletId($connection, $userId);
+        updateOperation($connection, $walletId, $userId, $input);
     }
     if ($method === 'DELETE') {
-        $walletId = readWalletId($_GET['walletId'] ?? null, true) ?? defaultWalletId($connection);
+        $walletId = readWalletId($_GET['walletId'] ?? null, true) ?? defaultWalletId($connection, $userId);
         if (($_GET['operationId'] ?? null) !== null) {
-            deleteOperation($connection, $walletId, readOperationId($_GET['operationId']));
+            deleteOperation($connection, $walletId, $userId, readOperationId($_GET['operationId']));
         }
-        clearOperations($connection, $walletId);
+        clearOperations($connection, $walletId, $userId);
     }
 
     header('Allow: GET, POST, PATCH, DELETE');
