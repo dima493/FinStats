@@ -1,1 +1,4 @@
 .idea/
+deploy/infinityfree/finstats-full.sql
+deploy/infinityfree/finstats-htdocs.zip
+deploy/infinityfree/htdocs/api/config.php

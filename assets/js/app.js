@@ -110,6 +110,8 @@
             currencySymbol: document.getElementById("currency-symbol"),
             emptyCurrencySymbol: document.getElementById("empty-currency-symbol"),
             exportButton: document.getElementById("export-button"),
+            importButton: document.getElementById("import-button"),
+            importFile: document.getElementById("import-file"),
             converterAmount: document.getElementById("converter-amount"),
             converterFrom: document.getElementById("converter-from"),
             converterTo: document.getElementById("converter-to"),
@@ -265,6 +267,7 @@
             elements.clearButton.disabled = isWalletBusy || !isWalletReady || transactions.length === 0;
             elements.walletSelect.disabled = isWalletBusy || !isWalletReady || wallets.length === 0;
             elements.newWalletButton.disabled = isWalletBusy || !isWalletReady;
+            elements.importButton.disabled = isWalletBusy || !isWalletReady;
             elements.walletSettingsButton.disabled = isWalletBusy || !isWalletReady;
             elements.transactionList.querySelectorAll(".transaction-action-button").forEach((button) => {
                 button.disabled = isWalletBusy || !isWalletReady;
@@ -739,6 +742,123 @@
             downloadLink.remove();
             window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
             showToast("Wallet result exported as wallet-result.json");
+        }
+
+        function importedAmountCents(entry, data) {
+            if (Number.isFinite(entry.amountUsd) && entry.amountUsd > 0) {
+                return Math.round(entry.amountUsd * 100);
+            }
+            if (!Number.isFinite(entry.amount) || entry.amount <= 0) {
+                throw new Error("Each imported transaction needs a positive amount.");
+            }
+
+            const currency = entry.currency || data.currency || "USD";
+            const amountCents = Math.round(entry.amount * 100);
+            if (currency === "USD") return amountCents;
+
+            const rate = isValidRate(data.exchangeRates?.[currency])
+                ? data.exchangeRates[currency]
+                : (hasRate(currency) ? exchangeRates[currency] : null);
+            if (rate === null) {
+                throw new Error(`No exchange rate available to import ${currency} amounts.`);
+            }
+            return Math.round(amountCents / rate);
+        }
+
+        function parseImportedTransactions(data) {
+            if (!data || typeof data !== "object" || !Array.isArray(data.transactions)) {
+                throw new Error("This file is not a FinStats export: missing transactions list.");
+            }
+            if (data.transactions.length === 0) {
+                throw new Error("The file contains no transactions.");
+            }
+            if (data.transactions.length > 5000) {
+                throw new Error("The file contains more than 5000 transactions.");
+            }
+
+            const transactionKey = (type, amountCents, note, date) =>
+                `${type}|${amountCents}|${note}|${Date.parse(date)}`;
+            const existing = new Set(transactions.map((transaction) =>
+                transactionKey(transaction.type, transaction.amountCents, transaction.note, transaction.date)));
+            const operations = [];
+            let skipped = 0;
+
+            data.transactions.forEach((entry, index) => {
+                if (!entry || (entry.type !== "deposit" && entry.type !== "withdrawal")) {
+                    throw new Error(`Transaction ${index + 1} has an invalid type.`);
+                }
+                const amountCents = importedAmountCents(entry, data);
+                if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+                    throw new Error(`Transaction ${index + 1} has an invalid amount.`);
+                }
+                if (typeof entry.date !== "string" || Number.isNaN(Date.parse(entry.date))) {
+                    throw new Error(`Transaction ${index + 1} has an invalid date.`);
+                }
+                const note = typeof entry.note === "string" ? entry.note : "";
+                if (existing.has(transactionKey(entry.type, amountCents, note, entry.date))) {
+                    skipped += 1;
+                    return;
+                }
+                operations.push({ type: entry.type, amountCents, note, date: entry.date });
+            });
+
+            return { operations, skipped };
+        }
+
+        async function importJsonFile(file) {
+            let data;
+            try {
+                data = JSON.parse(await file.text());
+            } catch (error) {
+                showToast("The selected file is not valid JSON.");
+                return;
+            }
+
+            let parsed;
+            try {
+                parsed = parseImportedTransactions(data);
+            } catch (error) {
+                showToast(error.message);
+                return;
+            }
+
+            const { operations, skipped } = parsed;
+            if (operations.length === 0) {
+                showToast("All transactions from this file are already in this wallet.");
+                return;
+            }
+
+            const netCents = operations.reduce(
+                (sum, operation) => sum + (operation.type === "deposit" ? operation.amountCents : -operation.amountCents),
+                0
+            );
+            const confirmed = window.confirm(
+                `Import ${operations.length} transaction${operations.length === 1 ? "" : "s"} into "${activeWalletName}"? ` +
+                `Balance change: ${netCents < 0 ? "−" : "+"}${formatCurrency(Math.abs(netCents))}.` +
+                (skipped > 0 ? ` ${skipped} duplicate${skipped === 1 ? "" : "s"} skipped.` : "")
+            );
+            if (!confirmed) return;
+
+            isWalletBusy = true;
+            updateWalletControls();
+            setWalletStatus("Importing transactions to MySQL…");
+
+            try {
+                const payload = await apiRequest("POST", {
+                    action: "import",
+                    walletId: activeWalletId,
+                    operations: [...operations].reverse()
+                });
+                applyWallet(payload);
+                setWalletStatus(`Connected to MySQL. "${activeWalletName}" is saved on this server.`);
+                showToast(`Imported ${operations.length} transaction${operations.length === 1 ? "" : "s"} into "${activeWalletName}".`);
+            } catch (error) {
+                setWalletStatus("The import was not saved. " + error.message, true);
+                showToast(error.message);
+            } finally {
+                isWalletBusy = false;
+                updateWalletControls();
+            }
         }
 
         function showAuthOverlay(mode) {
@@ -1243,6 +1363,15 @@
         });
         elements.refreshRates.addEventListener("click", () => refreshLiveRates(true));
         elements.exportButton.addEventListener("click", exportJson);
+        elements.importButton.addEventListener("click", () => {
+            if (isWalletBusy || !isWalletReady) return;
+            elements.importFile.click();
+        });
+        elements.importFile.addEventListener("change", () => {
+            const file = elements.importFile.files[0];
+            elements.importFile.value = "";
+            if (file) importJsonFile(file);
+        });
 
         elements.currentDate.textContent = new Intl.DateTimeFormat("en-US", {
             weekday: "long",

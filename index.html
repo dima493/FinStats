@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="A simple wallet calculator for tracking deposits, withdrawals, and your current balance.">
     <title>FinStats — Wallet Calculator</title>
-    <script src="assets/js/app.js"></script>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="assets/js/app.js?v=20261110"></script>
+    <link rel="stylesheet" href="assets/css/style.css?v=20261110">
 </head>
 <body>
     <header class="page-header">
@@ -37,6 +37,13 @@
                         <path d="m16 17 5-5-5-5M21 12H9"/>
                     </svg>
                 </button>
+                <button class="button button-secondary" id="import-button" type="button" title="Import transactions from a wallet-result.json export" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 15V3m0 0 4 4m-4-4-4 4M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
+                    </svg>
+                    <span class="import-label">Import JSON</span>
+                </button>
+                <input id="import-file" type="file" accept=".json,application/json" hidden>
                 <button class="button button-secondary" id="export-button" type="button" title="Download balance and transaction history as JSON">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>

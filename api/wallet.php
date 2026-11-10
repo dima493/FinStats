@@ -245,16 +245,8 @@ function importOperations(PDO $connection, int $walletId, array $input): void
 
     $connection->beginTransaction();
     try {
-        fetchWallet($connection, $walletId, true);
-
-        $statement = $connection->prepare('SELECT COUNT(*) FROM operations WHERE wallet_id = ?');
-        $statement->execute([$walletId]);
-        if ((int) $statement->fetchColumn() !== 0) {
-            $connection->rollBack();
-            respond(409, ['error' => 'Import is only available for an empty wallet.']);
-        }
-
-        $balance = 0;
+        $wallet = fetchWallet($connection, $walletId, true);
+        $balance = (int) $wallet['balance_cents'];
         $insert = $connection->prepare(
             'INSERT INTO operations (wallet_id, type, amount_cents, note, created_at)
              VALUES (?, ?, ?, ?, ?)'
