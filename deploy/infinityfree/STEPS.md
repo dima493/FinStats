@@ -9,8 +9,11 @@ Package contents:
 | `htdocs/api/config.sample.php` | Secret-free connection template — copy to `config.php` and fill in your values |
 | `finstats-schema.sql` | Database tables only — fresh start, no data |
 | `finstats-full.sql` | Full export of your local database: tables + your real wallets, transactions and account. **Private file — do not share or commit it.** |
+| `upgrade-auth.sql` | One-time database upgrade for an **existing** installation: adds per-user wallets and password recovery. See "Upgrade an existing installation" below. |
 
 Both SQL files were test-imported successfully. Choose **one** of them in step 3.
+
+**Already deployed FinStats before?** Skip steps 1–6 and follow [Upgrade an existing installation](#upgrade-an-existing-installation-auth-suite) instead.
 
 ## 1. Create the hosting account
 
@@ -36,7 +39,7 @@ Both SQL files were test-imported successfully. Choose **one** of them in step 3
 2. Select your database (`if0_XXXXXXXX_finstats`) in the left sidebar.
 3. Open the **Import** tab, click **Choose File**, and pick ONE file:
    - `finstats-full.sql` — keeps your existing wallets, transactions and login. Recommended if you want your current data on the hosted site.
-   - `finstats-schema.sql` — empty tables with one default wallet; you create your account on first visit.
+   - `finstats-schema.sql` — empty tables; on first visit you create your account, which gets its own "Main wallet".
 4. Click **Go**. You should see the `users`, `wallets` and `operations` tables afterwards.
 
 Do not import the project root's `database.sql` — its `CREATE DATABASE` statement is not allowed on shared hosting.
@@ -76,13 +79,65 @@ Do not upload the `.sql` files to the server — they are only for the phpMyAdmi
 
 1. Visit your domain, e.g. `https://finstats.ct.ws`.
 2. If you imported `finstats-full.sql`: sign in with your existing account — your wallets and history should be there.
-3. If you imported `finstats-schema.sql`: the setup screen appears; create your account.
+3. If you imported `finstats-schema.sql`: the sign-up screen appears; create your account.
 4. Make a small deposit in a temporary wallet, check the balance and history, then delete the temporary wallet.
+
+## Upgrade an existing installation (auth suite)
+
+Use this if FinStats is already running on InfinityFree and you want the new
+features: public sign-up, sign-out, change password, forgot password (recovery
+code), and delete account. Wallets become **private per account** — a new
+signup only sees its own wallets, never yours.
+
+**Order matters: upgrade the database first, then upload the files.** The new
+code needs the new columns; the old code keeps working with the upgraded
+database, so there is no downtime window where the site breaks.
+
+### 1. Back up (2 minutes)
+
+1. Control Panel → **phpMyAdmin** → select your database (`if0_XXXXXXXX_finstats`) in the left sidebar.
+2. Open the **Export** tab → method **Quick** → format **SQL** → **Go**. Keep the downloaded file safe.
+
+### 2. Run the database upgrade
+
+1. Still in phpMyAdmin with your database selected, open the **Import** tab.
+2. Choose `upgrade-auth.sql` (from `deploy/infinityfree/`) and click **Go**.
+3. It adds `users.recovery_code_hash` and `wallets.user_id`, and assigns all existing wallets to your existing account (user id 1). Balances and transactions are untouched.
+4. Run it **once only**. If you accidentally run it twice, phpMyAdmin reports "Duplicate column" errors — harmless, the first run already succeeded.
+
+If your hosted database is still empty (you imported `finstats-schema.sql` long ago and never created an account), you can instead delete the three tables and import the **new** `finstats-schema.sql` — no upgrade needed.
+
+### 3. Upload the changed files
+
+Upload these 7 files from `deploy/infinityfree/htdocs/` (File Manager or FTP), overwriting the old versions:
+
+| Local file | Server destination |
+| --- | --- |
+| `index.html` | `htdocs/index.html` |
+| `assets/js/app.js` | `htdocs/assets/js/app.js` |
+| `assets/css/style.css` | `htdocs/assets/css/style.css` |
+| `api/auth.php` | `htdocs/api/auth.php` |
+| `api/helpers.php` | `htdocs/api/helpers.php` |
+| `api/wallet.php` | `htdocs/api/wallet.php` |
+| `api/wallets.php` | `htdocs/api/wallets.php` |
+
+**Do NOT overwrite `htdocs/api/config.php` on the server** — it already holds your correct hosting database credentials. (`api/database.php` is unchanged and needs no upload.)
+
+### 4. Verify
+
+1. Open your site and hard-refresh (**Ctrl+F5**) so the browser picks up the new `app.js`/`style.css`.
+2. Sign in with your existing account — your wallets and balances must be exactly as before.
+3. Click the new **person icon** in the header → the Account dialog opens.
+4. Recommended: enter your current password and click **Generate recovery code**. Save the code somewhere safe — it is shown once and lets you reset the password if you forget it.
+5. Test sign-out (door icon) and sign back in.
+6. Optional: open the site in a private/incognito window, create a second account via **Create an account**, and confirm it starts with an empty "Main wallet" and cannot see your wallets. Delete that test account afterwards (Account dialog → Delete my account).
 
 ## Troubleshooting
 
 - **"Cannot connect to MySQL"** — recheck all four values in `api/config.php`; the host must be the `sqlXXX.infinityfree.com` name, not `localhost`. The error message text mentions XAMPP (shared codebase) — on InfinityFree it means the credentials are wrong.
 - **"The database tables are missing"** — the import in step 3 didn't run on the right database; select `if0_XXXXXXXX_finstats` in phpMyAdmin and import again.
+- **"The database schema is outdated"** — the SQL upgrade for your code version hasn't run. For the auth suite, import `upgrade-auth.sql` with your database selected (see the upgrade section). For older multi-wallet versions it was `upgrade.sql`.
+- **Old login screen after uploading (no "Create an account" link)** — the browser cached the old `app.js`; hard-refresh with Ctrl+F5.
 - **403 / blank page on first visit** — InfinityFree blocks some automated requests and new accounts can take a few minutes to activate; use a normal browser and wait a bit.
 - **Changes not visible** — clear browser cache; file uploads can take a minute to propagate.
 - Free accounts sleep when inactive; the first visit after inactivity may be slow.

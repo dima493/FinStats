@@ -45,12 +45,14 @@ function startAuthSession(): void
     session_start();
 }
 
-function requireAuth(): void
+function requireAuth(): int
 {
     startAuthSession();
     if (!isset($_SESSION['user_id'])) {
         respond(401, ['error' => 'Authentication required. Sign in to continue.']);
     }
+
+    return (int) $_SESSION['user_id'];
 }
 
 function readWalletId(mixed $value, bool $optional = false): ?int
@@ -113,12 +115,12 @@ function validateWalletName(mixed $value): string
     return $name;
 }
 
-function fetchWallet(PDO $connection, int $walletId, bool $forUpdate = false): array
+function fetchWallet(PDO $connection, int $walletId, int $userId, bool $forUpdate = false): array
 {
     $statement = $connection->prepare(
-        'SELECT id, name, balance_cents FROM wallets WHERE id = ?' . ($forUpdate ? ' FOR UPDATE' : '')
+        'SELECT id, name, balance_cents FROM wallets WHERE id = ? AND user_id = ?' . ($forUpdate ? ' FOR UPDATE' : '')
     );
-    $statement->execute([$walletId]);
+    $statement->execute([$walletId, $userId]);
     $wallet = $statement->fetch();
 
     if ($wallet === false) {
@@ -128,19 +130,23 @@ function fetchWallet(PDO $connection, int $walletId, bool $forUpdate = false): a
     return $wallet;
 }
 
-function defaultWalletId(PDO $connection): int
+function defaultWalletId(PDO $connection, int $userId): int
 {
-    $walletId = $connection->query('SELECT id FROM wallets ORDER BY id LIMIT 1')->fetchColumn();
+    $statement = $connection->prepare('SELECT id FROM wallets WHERE user_id = ? ORDER BY id LIMIT 1');
+    $statement->execute([$userId]);
+    $walletId = $statement->fetchColumn();
     if ($walletId === false) {
-        respond(409, ['error' => 'No wallets exist. Import database.sql first.']);
+        respond(409, ['error' => 'No wallets exist for this account.']);
     }
 
     return (int) $walletId;
 }
 
-function walletsPayload(PDO $connection): array
+function walletsPayload(PDO $connection, int $userId): array
 {
-    $rows = $connection->query('SELECT id, name, balance_cents FROM wallets ORDER BY id')->fetchAll();
+    $statement = $connection->prepare('SELECT id, name, balance_cents FROM wallets WHERE user_id = ? ORDER BY id');
+    $statement->execute([$userId]);
+    $rows = $statement->fetchAll();
 
     return array_map(static function (array $row): array {
         return [

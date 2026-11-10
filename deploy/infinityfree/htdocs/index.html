@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="A simple wallet calculator for tracking deposits, withdrawals, and your current balance.">
     <title>FinStats — Wallet Calculator</title>
-    <script src="assets/js/app.js?v=20261110"></script>
-    <link rel="stylesheet" href="assets/css/style.css?v=20261110">
+    <script src="assets/js/app.js?v=20261110-2"></script>
+    <link rel="stylesheet" href="assets/css/style.css?v=20261110-2">
 </head>
 <body>
     <header class="page-header">
@@ -31,6 +31,12 @@
                         <option value="blue">Blue</option>
                     </select>
                 </label>
+                <button class="button button-secondary icon-button" id="account-button" type="button" title="Account settings" aria-label="Account settings" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                </button>
                 <button class="button button-secondary icon-button" id="logout-button" type="button" title="Sign out" aria-label="Sign out" hidden>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -305,6 +311,48 @@
         </form>
     </dialog>
 
+    <dialog class="wallet-dialog" id="account-dialog" aria-labelledby="account-dialog-title">
+        <div class="wallet-dialog-form">
+            <div class="card-header">
+                <div>
+                    <h2 id="account-dialog-title">Account</h2>
+                    <p class="card-subtitle" id="account-subtitle">Manage your sign-in and account security.</p>
+                </div>
+            </div>
+            <div class="field">
+                <label for="account-current">Current password</label>
+                <input id="account-current" type="password" maxlength="72" autocomplete="current-password">
+            </div>
+            <div class="field">
+                <label for="account-new">New password</label>
+                <input id="account-new" type="password" maxlength="72" autocomplete="new-password">
+            </div>
+            <div class="field">
+                <label for="account-confirm">Confirm new password</label>
+                <input id="account-confirm" type="password" maxlength="72" autocomplete="new-password">
+            </div>
+            <p class="field-error" id="account-error" role="alert"></p>
+            <div class="dialog-actions">
+                <div class="dialog-actions-primary">
+                    <button class="button button-secondary" id="account-close-button" type="button">Close</button>
+                    <button class="button button-deposit" id="account-password-button" type="button">Change password</button>
+                </div>
+            </div>
+            <div class="account-section">
+                <h3>Recovery code</h3>
+                <p class="card-subtitle" id="account-recovery-status">No recovery code yet. Generate one to reset your password if you forget it.</p>
+                <p class="recovery-code" id="account-recovery-code" hidden></p>
+                <p class="card-subtitle" id="account-recovery-note" hidden>Save this code somewhere safe. It is shown only once and works one time. Generating a new code replaces the old one.</p>
+                <button class="button button-secondary" id="account-recovery-button" type="button">Generate recovery code</button>
+            </div>
+            <div class="account-section">
+                <h3>Delete account</h3>
+                <p class="card-subtitle">Permanently removes your account and all of its wallets and transactions.</p>
+                <button class="text-button dialog-delete" id="account-delete-button" type="button">Delete my account</button>
+            </div>
+        </div>
+    </dialog>
+
     <div class="auth-overlay" id="auth-overlay" hidden>
         <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
             <div class="brand auth-brand" aria-hidden="true">
@@ -322,8 +370,12 @@
                     <label for="auth-username">Username</label>
                     <input id="auth-username" name="auth-username" type="text" maxlength="60" autocomplete="username" required>
                 </div>
+                <div class="field" id="auth-recovery-field" hidden>
+                    <label for="auth-recovery">Recovery code</label>
+                    <input id="auth-recovery" name="auth-recovery" type="text" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX">
+                </div>
                 <div class="field">
-                    <label for="auth-password">Password</label>
+                    <label for="auth-password" id="auth-password-label">Password</label>
                     <input id="auth-password" name="auth-password" type="password" maxlength="72" autocomplete="current-password" required>
                 </div>
                 <div class="field" id="auth-confirm-field" hidden>
@@ -332,6 +384,10 @@
                 </div>
                 <p class="field-error" id="auth-error" role="alert"></p>
                 <button class="button button-deposit auth-submit" id="auth-submit" type="submit">Sign in</button>
+                <div class="auth-links">
+                    <button class="text-button" id="auth-forgot-link" type="button">Forgot password?</button>
+                    <button class="text-button" id="auth-switch-link" type="button">Create an account</button>
+                </div>
             </form>
         </div>
     </div>

@@ -6,12 +6,12 @@ require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/helpers.php';
 
 try {
-    requireAuth();
+    $userId = requireAuth();
     $connection = database();
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
     if ($method === 'GET') {
-        respond(200, ['wallets' => walletsPayload($connection)]);
+        respond(200, ['wallets' => walletsPayload($connection, $userId)]);
     }
 
     if ($method === 'POST') {
@@ -19,8 +19,10 @@ try {
         $name = validateWalletName($input['name'] ?? null);
 
         try {
-            $statement = $connection->prepare('INSERT INTO wallets (name, balance_cents) VALUES (?, 0)');
-            $statement->execute([$name]);
+            $statement = $connection->prepare(
+                'INSERT INTO wallets (user_id, name, balance_cents) VALUES (?, ?, 0)'
+            );
+            $statement->execute([$userId, $name]);
         } catch (PDOException $error) {
             if (isDuplicateKey($error)) {
                 respond(422, ['error' => 'A wallet with that name already exists.']);
@@ -34,7 +36,7 @@ try {
                 'name' => $name,
                 'balanceCents' => 0,
             ],
-            'wallets' => walletsPayload($connection),
+            'wallets' => walletsPayload($connection, $userId),
         ]);
     }
 
@@ -42,7 +44,7 @@ try {
         $input = readJsonBody();
         $walletId = readWalletId($input['id'] ?? $_GET['id'] ?? null);
         $name = validateWalletName($input['name'] ?? null);
-        $wallet = fetchWallet($connection, $walletId);
+        $wallet = fetchWallet($connection, $walletId, $userId);
 
         try {
             $statement = $connection->prepare('UPDATE wallets SET name = ? WHERE id = ?');
@@ -60,15 +62,17 @@ try {
                 'name' => $name,
                 'balanceCents' => (int) $wallet['balance_cents'],
             ],
-            'wallets' => walletsPayload($connection),
+            'wallets' => walletsPayload($connection, $userId),
         ]);
     }
 
     if ($method === 'DELETE') {
         $walletId = readWalletId($_GET['id'] ?? null);
-        fetchWallet($connection, $walletId);
+        fetchWallet($connection, $walletId, $userId);
 
-        $walletCount = (int) $connection->query('SELECT COUNT(*) FROM wallets')->fetchColumn();
+        $statement = $connection->prepare('SELECT COUNT(*) FROM wallets WHERE user_id = ?');
+        $statement->execute([$userId]);
+        $walletCount = (int) $statement->fetchColumn();
         if ($walletCount <= 1) {
             respond(409, ['error' => 'At least one wallet must remain.']);
         }
@@ -76,7 +80,7 @@ try {
         $statement = $connection->prepare('DELETE FROM wallets WHERE id = ?');
         $statement->execute([$walletId]);
 
-        respond(200, ['wallets' => walletsPayload($connection)]);
+        respond(200, ['wallets' => walletsPayload($connection, $userId)]);
     }
 
     header('Allow: GET, POST, PATCH, DELETE');
